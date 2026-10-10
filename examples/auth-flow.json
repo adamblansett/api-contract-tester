@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "name": "Authenticated API Flow",
+  "description": "API contract test showing environment variable interpolation and secret token redaction",
+  "config": {
+    "baseUrl": "http://127.0.0.1:3000",
+    "timeoutMs": 8000
+  },
+  "tests": [
+    {
+      "id": "authenticated-profile",
+      "name": "Fetch authenticated profile with Bearer secret",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/profile",
+        "headers": {
+          "Authorization": "Bearer ${API_AUTH_TOKEN:-default_token_for_dev}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "contentType": "application/json",
+        "hasProperties": ["id", "username", "roles"],
+        "contains": {
+          "roles": ["authenticated"]
+        }
+      }
+    }
+  ]
+}

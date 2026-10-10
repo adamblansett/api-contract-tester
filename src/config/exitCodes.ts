@@ -1,0 +1,7 @@
+export enum ExitCode {
+  SUCCESS = 0,
+  ASSERTION_FAILURE = 1,
+  SPEC_ERROR = 2,
+  TRANSPORT_ERROR = 3,
+  CONFIG_OR_INTERNAL_ERROR = 4,
+}

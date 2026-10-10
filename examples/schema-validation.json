@@ -1,0 +1,37 @@
+{
+  "version": "1.0.0",
+  "name": "Strict JSON Schema Contract",
+  "description": "Validation test demonstrating complex Ajv JSON schema assertions",
+  "config": {
+    "baseUrl": "http://127.0.0.1:3000"
+  },
+  "tests": [
+    {
+      "id": "validate-product-catalog",
+      "name": "Verify product catalog schema adherence",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/products/100"
+      },
+      "expect": {
+        "status": 200,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "sku": { "type": "string", "pattern": "^SKU-[0-9]{4}$" },
+            "price": { "type": "number", "minimum": 0 },
+            "inStock": { "type": "boolean" },
+            "categories": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1
+            }
+          },
+          "required": ["id", "sku", "price", "inStock", "categories"]
+        }
+      }
+    }
+  ]
+}

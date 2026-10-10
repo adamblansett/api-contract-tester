@@ -1,0 +1,118 @@
+{
+  "version": "1.0.0",
+  "name": "Users API Contract Tests",
+  "description": "Integration and contract tests for the user management API service",
+  "config": {
+    "baseUrl": "http://127.0.0.1:3000",
+    "timeoutMs": 10000,
+    "allowDestructive": true,
+    "headers": {
+      "User-Agent": "api-contract-tester/0.1.0",
+      "Accept": "application/json"
+    }
+  },
+  "tests": [
+    {
+      "id": "health-check",
+      "name": "Service health check probe",
+      "request": {
+        "method": "GET",
+        "path": "/health"
+      },
+      "expect": {
+        "status": 200,
+        "contentType": "application/json",
+        "hasProperties": ["status", "uptime"],
+        "exact": {
+          "status": "ok"
+        },
+        "maxResponseTimeMs": 500
+      }
+    },
+    {
+      "id": "list-users",
+      "name": "Retrieve paginated user list",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/users",
+        "query": {
+          "limit": 10,
+          "offset": 0
+        }
+      },
+      "expect": {
+        "status": 200,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "number" },
+                  "name": { "type": "string" },
+                  "email": { "type": "string" }
+                },
+                "required": ["id", "name", "email"]
+              }
+            },
+            "total": { "type": "number" }
+          },
+          "required": ["items", "total"]
+        }
+      }
+    },
+    {
+      "id": "create-user",
+      "name": "Create new user account",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/users",
+        "body": {
+          "name": "Jane Doe",
+          "email": "jane@example.com",
+          "role": "engineer"
+        }
+      },
+      "expect": {
+        "status": [200, 201],
+        "contentType": "application/json",
+        "headers": {
+          "required": ["location"]
+        },
+        "hasProperties": ["id", "email"],
+        "exact": {
+          "email": "jane@example.com"
+        }
+      }
+    },
+    {
+      "id": "get-user-by-id",
+      "name": "Fetch user by identifier",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/users/42"
+      },
+      "expect": {
+        "status": 200,
+        "hasProperties": ["id", "name"],
+        "exact": {
+          "id": 42
+        }
+      }
+    },
+    {
+      "id": "delete-user",
+      "name": "Remove user account",
+      "request": {
+        "method": "DELETE",
+        "path": "/api/v1/users/42"
+      },
+      "expect": {
+        "status": [200, 204]
+      }
+    }
+  ]
+}
