@@ -312,6 +312,28 @@ npm run build
 
 ---
 
+## ⚖️ Legal Disclaimer & Limitation of Liability
+
+### 1. "AS IS" and Express Warranty Disclaimer
+This software, documentation, contract validation engines, and test runners are provided on an **"AS IS"** and **"AS AVAILABLE"** basis, **WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND**, either express, implied, statutory, or otherwise. To the maximum extent permitted by applicable law, the author, copyright holders, and contributors expressly disclaim all warranties, including but not limited to implied warranties of merchantability, fitness for a particular purpose, title, quiet enjoyment, and non-infringement.
+
+### 2. Authorized Testing & Network Traffic Notice
+- **Explicit Authorization Required:** `api-contract-tester` generates active HTTP/HTTPS network traffic and synthetic payloads. Users must possess explicit, documented authorization from the system owner before executing contract tests or load against any target endpoint, API gateway, or network host.
+- **Compliance with Computer Fraud Statutes:** Unauthorized probing, scanning, or fuzzing of computer systems may violate local and international cybercrime statutes (such as the United States Computer Fraud and Abuse Act - CFAA 18 U.S.C. § 1030). The user assumes sole and exclusive responsibility for ensuring all testing activities are lawful and authorized.
+- The author and contributors expressly disclaim all liability for unauthorized network scans, firewall bans, IP blacklisting, denial-of-service conditions, or billing surges triggered by running this tool against third-party endpoints.
+
+### 3. Contract Conformance vs. Production Safety
+- **Heuristic Scope:** Validation of an HTTP endpoint against an OpenAPI 3.x specification confirms schema structural compatibility at the moment of testing. It does **not** guarantee business logic correctness, absence of concurrency or race conditions, transaction integrity, database consistency, authorization soundness, or production resilience under high load.
+- Passing all contract tests does not guarantee that an API is defect-free, secure, or safe for production release.
+
+### 4. Limitation of Liability
+To the maximum extent permitted by applicable law, **IN NO EVENT SHALL THE AUTHOR, COPYRIGHT HOLDERS, OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, PUNITIVE, OR CONSEQUENTIAL DAMAGES** (including, but not limited to, loss of use, data, revenue, profits, business, or goodwill; system downtime; API breaking changes; service level agreement (SLA) penalties; data corruption; or procurement of substitute goods or services), however caused and on any theory of liability, whether in contract, strict liability, tort (including negligence or otherwise), or statute, arising in any way out of the use, reproduction, modification, distribution, or reliance upon this software, even if advised of the possibility of such damages.
+
+### 5. Third-Party Trademarks & Non-Affiliation
+All product names, logos, brands, and registered trademarks mentioned within this project (including OpenAPI, Swagger, Postman, Node.js, and Vitest) are the property of their respective owners. Mention of these entities does not imply endorsement, sponsorship, or affiliation with the author.
+
+---
+
 ## License
 
 MIT © 2025-2026 [Adam Blansett](https://adamblansett.com)
