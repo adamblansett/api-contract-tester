@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-11-18
+
+### Security
+
+- **SSRF & IP Evasion Hardening (`src/security/dns.ts`)**:
+  - Expanded IPv4 blacklisting to include Carrier-Grade NAT (RFC 6598: `100.64.0.0/10`), current network (`0.0.0.0/8`), broadcast (`255.255.255.255`), documentation blocks (RFC 5737: `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`), benchmarking (RFC 2544: `198.18.0.0/15`), multicast (RFC 5771: `224.0.0.0/4`), and reserved ranges (RFC 1112: `240.0.0.0/4`).
+  - Added mathematical IPv6 word parser and normalizer (`parseIPv6Words`) defeating compressed zeros (`::`), hexadecimal and dotted IPv4-mapped representations (`::ffff:127.0.0.1`, `::ffff:7f00:1`), NAT64 well-known prefixes (RFC 6052: `64:ff9b::/96`), 6to4 relays (RFC 3056: `2002::/16`), unique local (`fc00::/7`), link-local (`fe80::/10`), discard prefixes (RFC 6666: `100::/64`), and multicast (`ff00::/8`).
+  - Blocked WHATWG restricted protocol ports (e.g. SMTP 25/465/587, SSH 22, SMB 445, FTP 20/21) under `--block-private-networks` to prevent cross-protocol smuggling attacks.
+- **CRLF & Header Injection Prevention (`src/security/guards.ts`, `src/spec/schema.ts`)**:
+  - Implemented `assertValidHeaders` enforcing RFC 9110 field-name token grammar on header keys.
+  - Strictly prohibited `\r`, `\n`, and null bytes (`\0`) across header names and values to prevent HTTP response splitting and request smuggling.
+  - Enforced schema-level header validation and prohibited prototype pollution property names (`__proto__`, `constructor`, `prototype`).
+- **Deep Prototype Pollution Protection**:
+  - Hardened property path lookups (`pathUtils.ts`) against forbidden prototype identifiers in header and body lookups.
+  - Isolated variable capture (`capture`) and session variables in `executor.ts` using prototype-free dictionaries (`Object.create(null)`).
+  - Constrained captured variable names to valid identifier syntax (`/^[a-zA-Z_][a-zA-Z0-9_]*$/`) and prohibited prototype names.
+- **Automated Secret & Token Redaction (`src/security/redaction.ts`)**:
+  - Added automated regex-based redaction for JSON Web Tokens (`ey...` -> `[REDACTED_JWT]`), AWS Access Key IDs (`AKIA...` -> `[REDACTED_AWS_KEY]`), and PEM Private Key blocks (`[REDACTED_PRIVATE_KEY]`).
+  - Expanded sensitive header and parameter matching (`x-csrf-token`, `jwt`, `private-key`, `x-amz-security-token`, `pin`, `cvv`, etc.).
+  - Redacted non-string primitive values (numbers, booleans) for sensitive fields in `redactDeep`.
+- **ReDoS Mitigation (`src/assertions/matches.ts`)**:
+  - Capped evaluated string values at 64KB and regex pattern lengths at 1000 characters to safeguard the Node.js event loop against catastrophic regex backtracking.
+- **Mock Server & Input Size Hardening**:
+  - Added request body size limits (5MB) on the mock HTTP server to prevent memory exhaustion DoS.
+  - Bound mock server to `127.0.0.1` by default and added security warning if exposed to `0.0.0.0`.
+  - Added default security headers (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Cache-Control: no-store`) to mock responses.
+  - Enforced a 10MB file size ceiling on specification inputs in `run` and `validate` commands.
+- Expanded test suite: 106 tests across 21 test files (100% passing).
+
 ## [0.2.0] - 2026-11-18
 
 ### Added

@@ -11,6 +11,33 @@ export const RetryConfigSchema = z
   })
   .strict();
 
+const FORBIDDEN_OBJECT_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+export const HeaderNameSchema = z
+  .string()
+  .min(1, 'Header name must not be empty')
+  .regex(/^[a-zA-Z0-9!#$%&'*+\-.^_`|~]+$/, 'Header name contains invalid characters or CRLF')
+  .refine(
+    (name) => !FORBIDDEN_OBJECT_KEYS.has(name.toLowerCase()),
+    'Header name is a prohibited prototype pollution vector',
+  );
+
+export const HeaderValueSchema = z
+  .string()
+  .refine(
+    (val) => !/[\r\n\0]/.test(val),
+    'Header value must not contain CRLF or null bytes (CRLF injection prevention)',
+  );
+
+export const CaptureVariableSchema = z
+  .string()
+  .min(1, 'Variable name must not be empty')
+  .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Captured variable name must be a valid identifier')
+  .refine(
+    (name) => !FORBIDDEN_OBJECT_KEYS.has(name.toLowerCase()),
+    'Captured variable name is a prohibited prototype pollution vector',
+  );
+
 export const RequestDefinitionSchema = z
   .object({
     method: HttpMethodSchema,
@@ -30,7 +57,7 @@ export const RequestDefinitionSchema = z
         (path) => !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(path.trim()),
         'Request path must be a relative path and must not contain absolute URLs or custom protocols',
       ),
-    headers: z.record(z.string(), z.string()).optional(),
+    headers: z.record(HeaderNameSchema, HeaderValueSchema).optional(),
     query: z
       .record(
         z.string(),
@@ -96,7 +123,7 @@ export const ExpectationDefinitionSchema = z
     matches: z.record(z.string(), z.string().min(1)).optional(),
     numeric: z.record(z.string(), NumericExpectationSchema).optional(),
     array: z.record(z.string(), ArrayExpectationSchema).optional(),
-    capture: z.record(z.string(), z.string().min(1)).optional(),
+    capture: z.record(CaptureVariableSchema, z.string().min(1)).optional(),
     maxResponseTimeMs: z.number().positive().optional(),
   })
   .strict();
@@ -134,7 +161,7 @@ export const SuiteConfigSchema = z
       .optional(),
     timeoutMs: z.number().int().positive().optional(),
     maxBodyBytes: z.number().int().positive().optional(),
-    headers: z.record(z.string(), z.string()).optional(),
+    headers: z.record(HeaderNameSchema, HeaderValueSchema).optional(),
     allowDestructive: z.boolean().optional(),
     redirect: RedirectPolicySchema.optional(),
     retry: RetryConfigSchema.optional(),

@@ -56,7 +56,35 @@ export async function runMockServerCommand(
   const port = options.port ?? 3000;
   const host = options.host ?? '127.0.0.1';
 
+  if (host === '0.0.0.0' || host === '::') {
+    console.warn(
+      pc.yellow(
+        `\n⚠ Warning: Binding mock server to "${host}" exposes it to all network interfaces. Use 127.0.0.1 for local isolation.\n`,
+      ),
+    );
+  }
+
   const server = http.createServer((req, res) => {
+    // Mitigate DoS via unbounded mock request bodies
+    let bytesReceived = 0;
+    const MAX_MOCK_PAYLOAD_BYTES = 5 * 1024 * 1024;
+    req.on('data', (chunk: Buffer) => {
+      bytesReceived += chunk.length;
+      if (bytesReceived > MAX_MOCK_PAYLOAD_BYTES) {
+        res.writeHead(413, {
+          'Content-Type': 'application/json',
+          'X-Content-Type-Options': 'nosniff',
+        });
+        res.end(
+          JSON.stringify({
+            error: 'Payload Too Large',
+            message: `Mock request exceeded ${MAX_MOCK_PAYLOAD_BYTES} bytes limit`,
+          }),
+        );
+        req.destroy();
+      }
+    });
+
     const parsedUrl = new URL(req.url ?? '/', `http://${host}:${port}`);
     const reqPath = parsedUrl.pathname;
     const reqMethod = req.method?.toUpperCase() ?? 'GET';
@@ -98,6 +126,9 @@ export async function runMockServerCommand(
       res.writeHead(statusCode, {
         'Content-Type': contentType,
         'X-Mocked-By': 'api-contract-tester',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        'Cache-Control': 'no-store',
       });
       res.end(bodyData);
 
@@ -105,7 +136,12 @@ export async function runMockServerCommand(
         `  ${pc.green('✔')} ${pc.bold(reqMethod)} ${reqPath} -> ${pc.cyan(String(statusCode))} (matched "${matchedTest.id}")`,
       );
     } else {
-      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.writeHead(404, {
+        'Content-Type': 'application/json',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        'Cache-Control': 'no-store',
+      });
       res.end(
         JSON.stringify({
           error: 'Not Found',

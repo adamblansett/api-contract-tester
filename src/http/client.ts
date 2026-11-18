@@ -1,7 +1,7 @@
 import { performance } from 'node:perf_hooks';
 import { DEFAULTS } from '../config/defaults.js';
 import { assertPublicDestination } from '../security/dns.js';
-import { PayloadLimitExceededError } from '../security/guards.js';
+import { assertValidHeaders, PayloadLimitExceededError } from '../security/guards.js';
 import { validateRedirectTarget } from './redirects.js';
 import { type HttpRequest, type HttpResponse, TransportError } from './types.js';
 
@@ -72,6 +72,9 @@ export class HttpClient {
             headersToSend[k] = v;
           }
         }
+
+        // Validate outgoing headers against CRLF injection and prototype vectors
+        assertValidHeaders(headersToSend);
 
         const fetchOptions: RequestInit = {
           method: currentMethod,

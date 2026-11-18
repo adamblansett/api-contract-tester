@@ -37,6 +37,17 @@ export function assertMatches(
       continue;
     }
 
+    if (pattern.length > 1000) {
+      results.push({
+        name: `Regex Match: ${path}`,
+        passed: false,
+        message: `Regex pattern length (${pattern.length}) exceeds maximum security limit of 1000 characters`,
+        expected: pattern,
+        actual: value,
+      });
+      continue;
+    }
+
     let regex: RegExp;
     try {
       regex = new RegExp(pattern);
@@ -52,6 +63,17 @@ export function assertMatches(
     }
 
     const strValue = typeof value === 'string' ? value : String(value);
+    if (strValue.length > 65536) {
+      results.push({
+        name: `Regex Match: ${path}`,
+        passed: false,
+        message: `Target value length (${strValue.length}) exceeds 64KB evaluation limit for regex assertions (ReDoS mitigation)`,
+        expected: pattern,
+        actual: strValue.slice(0, 100) + '... [truncated]',
+      });
+      continue;
+    }
+
     const passed = regex.test(strValue);
 
     results.push({

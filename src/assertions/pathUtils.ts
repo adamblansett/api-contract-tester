@@ -73,7 +73,7 @@ export function resolveResponseValue(response: HttpResponse, path: string): Path
   const headerMatch = trimmed.match(/^headers(?:\[['"](.+?)['"]\]|\.([a-zA-Z0-9_-]+))/i);
   if (headerMatch) {
     const headerName = (headerMatch[1] ?? headerMatch[2])?.toLowerCase();
-    if (!headerName) return { found: false, value: undefined };
+    if (!headerName || FORBIDDEN_KEYS.has(headerName)) return { found: false, value: undefined };
     const hasHeader = Object.prototype.hasOwnProperty.call(response.headers, headerName);
     return { found: hasHeader, value: response.headers[headerName] };
   }

@@ -1,6 +1,6 @@
 {
   "name": "api-contract-tester",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Production-minded TypeScript CLI that validates HTTP APIs against explicit contracts and detects integration regressions",
   "type": "module",
   "main": "./dist/index.js",

@@ -24,6 +24,13 @@ export class PayloadLimitExceededError extends Error {
   }
 }
 
+export class HeaderSecurityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'HeaderSecurityError';
+  }
+}
+
 const DESTRUCTIVE_METHODS = new Set<HttpMethod>(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /**
@@ -39,5 +46,53 @@ export function isDestructiveMethod(method: HttpMethod): boolean {
 export function assertMethodAllowed(method: HttpMethod, allowDestructive: boolean): void {
   if (isDestructiveMethod(method) && !allowDestructive) {
     throw new DestructiveMethodBlockedError(method);
+  }
+}
+
+const FORBIDDEN_HEADER_NAMES = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Asserts that HTTP request headers comply with RFC 9110 token rules and do not contain
+ * carriage returns, line feeds, null bytes, or prototype pollution vectors (CRLF injection prevention).
+ */
+export function assertValidHeaders(headers: Record<string, string>): void {
+  if (headers && typeof headers === 'object') {
+    const proto = Object.getPrototypeOf(headers);
+    if (proto !== Object.prototype && proto !== null) {
+      throw new HeaderSecurityError(
+        'Headers object has an invalid or tampered prototype (prototype pollution vector)',
+      );
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(headers, '__proto__')) {
+    throw new HeaderSecurityError(
+      'Header name "__proto__" is prohibited (prototype pollution vector)',
+    );
+  }
+
+  for (const [key, value] of Object.entries(headers)) {
+    if (!key || typeof key !== 'string') {
+      throw new HeaderSecurityError('Header name must be a non-empty string');
+    }
+    const lower = key.toLowerCase();
+    if (FORBIDDEN_HEADER_NAMES.has(lower)) {
+      throw new HeaderSecurityError(
+        `Header name "${key}" is prohibited (prototype pollution vector)`,
+      );
+    }
+    if (!/^[a-zA-Z0-9!#$%&'*+\-.^_`|~]+$/.test(key)) {
+      throw new HeaderSecurityError(
+        `Header name "${key}" contains invalid characters or CRLF (must conform to RFC 9110 field-name tokens)`,
+      );
+    }
+    if (typeof value !== 'string') {
+      throw new HeaderSecurityError(`Header "${key}" value must be a string`);
+    }
+    if (/[\r\n\0]/.test(value)) {
+      throw new HeaderSecurityError(
+        `Header "${key}" value contains CRLF or null bytes, which is prohibited to prevent HTTP header injection`,
+      );
+    }
   }
 }

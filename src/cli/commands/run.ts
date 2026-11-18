@@ -51,6 +51,24 @@ async function executeSuiteOnce(
     return { exitCode: ExitCode.SPEC_ERROR };
   }
 
+  const MAX_SPEC_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+  try {
+    const stat = fs.statSync(resolvedSpecPath);
+    if (stat.size > MAX_SPEC_SIZE_BYTES) {
+      console.error(
+        pc.red(`Error: Specification file exceeds 10MB size limit (${stat.size} bytes)`),
+      );
+      return { exitCode: ExitCode.SPEC_ERROR };
+    }
+  } catch (statErr) {
+    console.error(
+      pc.red(
+        `Error reading specification file: ${statErr instanceof Error ? statErr.message : String(statErr)}`,
+      ),
+    );
+    return { exitCode: ExitCode.SPEC_ERROR };
+  }
+
   // Load environment variables if specified
   const env: Record<string, string | undefined> = { ...process.env };
   if (options.envFile) {

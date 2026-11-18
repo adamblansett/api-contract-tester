@@ -4,7 +4,7 @@ import { runAssertions } from '../assertions/registry.js';
 import { DEFAULTS } from '../config/defaults.js';
 import { HttpClient } from '../http/client.js';
 import { type HttpRequest, type HttpResponse, TransportError } from '../http/types.js';
-import { assertMethodAllowed } from '../security/guards.js';
+import { assertMethodAllowed, assertValidHeaders } from '../security/guards.js';
 import { RedactionRegistry } from '../security/redaction.js';
 import { resolveSafeUrl, SecurityUrlError } from '../security/url.js';
 import { substituteEnvInValue, substituteString } from '../spec/env.js';
@@ -139,9 +139,17 @@ export class TestExecutor {
 
     // 4. Substitute environment and session variables
     const baseEnv = options.env ?? process.env;
+    const cleanSessionVars: Record<string, string | undefined> = Object.create(null);
+    if (options.sessionVariables) {
+      for (const [k, v] of Object.entries(options.sessionVariables)) {
+        if (!['__proto__', 'constructor', 'prototype'].includes(k.toLowerCase())) {
+          cleanSessionVars[k] = v;
+        }
+      }
+    }
     const combinedEnv: Record<string, string | undefined> = {
       ...baseEnv,
-      ...(options.sessionVariables ?? {}),
+      ...cleanSessionVars,
     };
 
     const { text: subPath, secretValues: pathSecrets } = substituteString(
@@ -166,6 +174,29 @@ export class TestExecutor {
       combinedEnv,
     );
     this.redaction.addSecrets(headerSecrets);
+
+    // Security check: Validate header names and values (CRLF injection prevention)
+    try {
+      assertValidHeaders(subHeaders);
+    } catch (headerErr) {
+      const durationMs = Math.round((performance.now() - startTime) * 100) / 100;
+      return {
+        id: test.id,
+        name: test.name,
+        status: 'ERROR',
+        durationMs,
+        request: {
+          method: test.request.method,
+          url: test.request.path,
+          headers: {},
+        },
+        assertions: [],
+        error: {
+          message: headerErr instanceof Error ? headerErr.message : String(headerErr),
+          code: 'GUARD_VIOLATION',
+        },
+      };
+    }
 
     // Process and substitute body
     let requestBodyString: string | undefined;
@@ -294,14 +325,21 @@ export class TestExecutor {
     const captured: Record<string, string> = {};
     if (test.expect.capture && typeof test.expect.capture === 'object') {
       for (const [varName, capturePath] of Object.entries(test.expect.capture)) {
+        const cleanName = varName.trim();
+        if (
+          !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(cleanName) ||
+          ['__proto__', 'constructor', 'prototype'].includes(cleanName.toLowerCase())
+        ) {
+          continue;
+        }
         const { found, value } = resolveResponseValue(response, capturePath);
         if (found && value !== undefined && value !== null) {
           const strVal = typeof value === 'string' ? value : JSON.stringify(value);
-          captured[varName] = strVal;
+          captured[cleanName] = strVal;
           // Immediately register captured value in the redaction registry
           this.redaction.addSecret(strVal);
           if (options.sessionVariables) {
-            options.sessionVariables[varName] = strVal;
+            options.sessionVariables[cleanName] = strVal;
           }
         }
       }

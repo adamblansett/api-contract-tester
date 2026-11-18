@@ -36,13 +36,22 @@ export { substituteString, substituteEnvInValue } from './spec/env.js';
 
 // Security
 export { validateBaseUrl, resolveSafeUrl, SecurityUrlError } from './security/url.js';
-export { isPrivateIPv4, isPrivateIPv6, assertPublicDestination } from './security/dns.js';
+export {
+  isPrivateIPv4,
+  isPrivateIPv6,
+  assertPublicDestination,
+  isRestrictedPort,
+  RESTRICTED_PORTS,
+  parseIPv6Words,
+} from './security/dns.js';
 export { RedactionRegistry } from './security/redaction.js';
 export {
   assertMethodAllowed,
   isDestructiveMethod,
+  assertValidHeaders,
   DestructiveMethodBlockedError,
   PayloadLimitExceededError,
+  HeaderSecurityError,
 } from './security/guards.js';
 
 // HTTP

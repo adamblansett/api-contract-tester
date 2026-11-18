@@ -2,15 +2,30 @@ const SENSITIVE_HEADER_NAMES = new Set([
   'authorization',
   'proxy-authorization',
   'x-api-key',
+  'api-key',
+  'apikey',
   'cookie',
   'set-cookie',
-  'apikey',
-  'api-key',
   'x-auth-token',
   'session',
+  'x-session-id',
+  'session-id',
+  'sessionid',
   'x-access-token',
   'x-secret',
+  'x-secret-key',
   'token',
+  'x-csrf-token',
+  'x-xsrf-token',
+  'x-amz-security-token',
+  'x-amz-signature',
+  'signature',
+  'sig',
+  'x-signature',
+  'x-hub-signature',
+  'private-key',
+  'privatekey',
+  'jwt',
 ]);
 
 const SENSITIVE_QUERY_PATTERNS = [
@@ -20,11 +35,23 @@ const SENSITIVE_QUERY_PATTERNS = [
   /passwd/i,
   /auth/i,
   /access_token/i,
+  /refresh_token/i,
+  /id_token/i,
   /api_key/i,
   /apikey/i,
   /private_key/i,
   /client_secret/i,
   /key/i,
+  /sig/i,
+  /signature/i,
+  /session/i,
+  /sessionid/i,
+  /cvv/i,
+  /pin/i,
+  /ssn/i,
+  /credit_card/i,
+  /webhook_secret/i,
+  /signing_key/i,
 ];
 
 export class RedactionRegistry {
@@ -83,7 +110,8 @@ export class RedactionRegistry {
         lower.includes('auth') ||
         lower.includes('secret') ||
         lower.includes('token') ||
-        lower.includes('key')
+        lower.includes('key') ||
+        lower.includes('signature')
       ) {
         redacted[key] = '[REDACTED]';
       } else {
@@ -125,7 +153,7 @@ export class RedactionRegistry {
   }
 
   /**
-   * Redacts all registered secret strings and patterns from a string.
+   * Redacts all registered secret strings and recognized secret patterns from a string.
    */
   public redactText(text: string): string {
     if (!text || typeof text !== 'string') return text;
@@ -144,11 +172,27 @@ export class RedactionRegistry {
     // Redact Basic auth tokens
     result = result.replace(/Basic\s+[A-Za-z0-9+/=]+/gi, 'Basic [REDACTED]');
 
+    // Pattern redaction: JSON Web Tokens (JWT)
+    result = result.replace(
+      /ey[A-Za-z0-9_-]{10,}\.ey[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g,
+      '[REDACTED_JWT]',
+    );
+
+    // Pattern redaction: AWS Access Key IDs
+    result = result.replace(/\b(AKIA|ASIA)[0-9A-Z]{16}\b/g, '[REDACTED_AWS_KEY]');
+
+    // Pattern redaction: Private Key blocks
+    result = result.replace(
+      /-----BEGIN [A-Z0-9 ]+PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]+PRIVATE KEY-----/g,
+      '[REDACTED_PRIVATE_KEY]',
+    );
+
     return result;
   }
 
   /**
    * Recursively redacts secrets and sensitive keys from any arbitrary object or array.
+   * Protects against prototype pollution during object cloning.
    */
   public redactDeep<T>(value: T): T {
     if (typeof value === 'string') {
@@ -167,12 +211,16 @@ export class RedactionRegistry {
 
       const clone: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+        if (k === '__proto__' || k === 'constructor' || k === 'prototype') {
+          continue;
+        }
+
         const lowerK = k.toLowerCase();
         const isSensitiveKey =
           SENSITIVE_HEADER_NAMES.has(lowerK) ||
           SENSITIVE_QUERY_PATTERNS.some((p) => p.test(lowerK));
 
-        if (isSensitiveKey && typeof v === 'string') {
+        if (isSensitiveKey) {
           clone[k] = '[REDACTED]';
         } else {
           clone[k] = this.redactDeep(v);

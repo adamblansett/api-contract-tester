@@ -12,6 +12,24 @@ export async function runValidateCommand(specPath: string): Promise<number> {
     return ExitCode.SPEC_ERROR;
   }
 
+  const MAX_SPEC_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+  try {
+    const stat = fs.statSync(resolvedPath);
+    if (stat.size > MAX_SPEC_SIZE_BYTES) {
+      console.error(
+        pc.red(`Error: Specification file exceeds 10MB size limit (${stat.size} bytes)`),
+      );
+      return ExitCode.SPEC_ERROR;
+    }
+  } catch (statErr) {
+    console.error(
+      pc.red(
+        `Error reading specification file: ${statErr instanceof Error ? statErr.message : String(statErr)}`,
+      ),
+    );
+    return ExitCode.SPEC_ERROR;
+  }
+
   let rawContent: string;
   try {
     rawContent = fs.readFileSync(resolvedPath, 'utf-8');
