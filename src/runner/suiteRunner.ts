@@ -12,12 +12,26 @@ export class SuiteRunner {
     this.executor = executor ?? new TestExecutor();
   }
 
+  public getExecutor(): TestExecutor {
+    return this.executor;
+  }
+
   public async runSuite(
     spec: TestSpecification,
     options: RunnerOptions = {},
   ): Promise<SuiteRunSummary> {
     const startTime = performance.now();
-    const concurrency = Math.max(1, options.concurrency ?? DEFAULTS.CONCURRENCY);
+    let concurrency = Math.max(1, options.concurrency ?? DEFAULTS.CONCURRENCY);
+
+    // If any test defines variable capture, force sequential execution to ensure determinism
+    const hasCapture = spec.tests.some(
+      (t) => t.expect?.capture && Object.keys(t.expect.capture).length > 0,
+    );
+    if (hasCapture && concurrency > 1) {
+      concurrency = 1;
+    }
+
+    const sessionVariables: Record<string, string> = { ...(options.sessionVariables ?? {}) };
     const results: TestExecutionResult[] = new Array(spec.tests.length);
 
     if (concurrency === 1) {
@@ -25,7 +39,16 @@ export class SuiteRunner {
       for (let i = 0; i < spec.tests.length; i++) {
         const test = spec.tests[i];
         if (test) {
-          results[i] = await this.executor.executeTest(test, spec, options);
+          const runOptions: RunnerOptions = {
+            ...options,
+            sessionVariables,
+          };
+          const result = await this.executor.executeTest(test, spec, runOptions);
+          results[i] = result;
+
+          if (result.capturedVariables) {
+            Object.assign(sessionVariables, result.capturedVariables);
+          }
         }
       }
     } else {

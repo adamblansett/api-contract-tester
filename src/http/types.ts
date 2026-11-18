@@ -1,4 +1,4 @@
-import type { HttpMethod } from '../spec/types.js';
+import type { HttpMethod, RetryConfig } from '../spec/types.js';
 import type { RedirectPolicy } from '../config/defaults.js';
 
 export interface HttpRequest {
@@ -9,6 +9,8 @@ export interface HttpRequest {
   timeoutMs: number;
   redirect: RedirectPolicy;
   maxBodyBytes: number;
+  retry?: RetryConfig;
+  blockPrivateNetworks?: boolean;
 }
 
 export interface HttpResponse {

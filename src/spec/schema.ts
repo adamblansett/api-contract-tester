@@ -4,6 +4,13 @@ const HttpMethodSchema = z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'
 
 const RedirectPolicySchema = z.enum(['manual', 'follow-same-origin', 'error']);
 
+export const RetryConfigSchema = z
+  .object({
+    maxAttempts: z.number().int().min(1).max(10),
+    backoffMs: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+
 export const RequestDefinitionSchema = z
   .object({
     method: HttpMethodSchema,
@@ -38,6 +45,7 @@ export const RequestDefinitionSchema = z
     body: z.unknown().optional(),
     timeoutMs: z.number().int().positive().optional(),
     redirect: RedirectPolicySchema.optional(),
+    retry: RetryConfigSchema.optional(),
   })
   .strict();
 
@@ -48,12 +56,35 @@ export const ExpectedHeadersSchema = z
   })
   .strict();
 
+const StatusClassSchema = z.enum(['1xx', '2xx', '3xx', '4xx', '5xx']);
+
+const SingleStatusSchema = z.union([z.number().int().min(100).max(599), StatusClassSchema]);
+
+export const NumericExpectationSchema = z
+  .object({
+    gt: z.number().optional(),
+    gte: z.number().optional(),
+    lt: z.number().optional(),
+    lte: z.number().optional(),
+    eq: z.number().optional(),
+  })
+  .strict();
+
+export const ArrayExpectationSchema = z
+  .object({
+    length: z.number().int().nonnegative().optional(),
+    minItems: z.number().int().nonnegative().optional(),
+    maxItems: z.number().int().nonnegative().optional(),
+    isNotEmpty: z.boolean().optional(),
+  })
+  .strict();
+
 export const ExpectationDefinitionSchema = z
   .object({
     status: z
       .union([
-        z.number().int().min(100).max(599),
-        z.array(z.number().int().min(100).max(599)).min(1, 'status array cannot be empty'),
+        SingleStatusSchema,
+        z.array(SingleStatusSchema).min(1, 'status array cannot be empty'),
       ])
       .optional(),
     headers: ExpectedHeadersSchema.optional(),
@@ -62,6 +93,10 @@ export const ExpectationDefinitionSchema = z
     hasProperties: z.array(z.string().min(1)).min(1).optional(),
     exact: z.record(z.string(), z.unknown()).optional(),
     contains: z.record(z.string(), z.unknown()).optional(),
+    matches: z.record(z.string(), z.string().min(1)).optional(),
+    numeric: z.record(z.string(), NumericExpectationSchema).optional(),
+    array: z.record(z.string(), ArrayExpectationSchema).optional(),
+    capture: z.record(z.string(), z.string().min(1)).optional(),
     maxResponseTimeMs: z.number().positive().optional(),
   })
   .strict();
@@ -102,6 +137,8 @@ export const SuiteConfigSchema = z
     headers: z.record(z.string(), z.string()).optional(),
     allowDestructive: z.boolean().optional(),
     redirect: RedirectPolicySchema.optional(),
+    retry: RetryConfigSchema.optional(),
+    blockPrivateNetworks: z.boolean().optional(),
   })
   .strict();
 

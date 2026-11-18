@@ -1,4 +1,5 @@
 import { performance } from 'node:perf_hooks';
+import { resolveResponseValue } from '../assertions/pathUtils.js';
 import { runAssertions } from '../assertions/registry.js';
 import { DEFAULTS } from '../config/defaults.js';
 import { HttpClient } from '../http/client.js';
@@ -10,6 +11,23 @@ import { substituteEnvInValue, substituteString } from '../spec/env.js';
 import type { TestCase, TestSpecification } from '../spec/types.js';
 import type { RunnerOptions, TestExecutionResult } from './types.js';
 
+export function buildCurlCommand(
+  method: string,
+  url: string,
+  headers: Record<string, string>,
+  body?: string,
+): string {
+  const parts: string[] = ['curl', '-s', '-S', '-X', method];
+  for (const [key, val] of Object.entries(headers)) {
+    parts.push('-H', `'${key}: ${val.replace(/'/g, "'\\''")}'`);
+  }
+  if (body && method !== 'GET' && method !== 'HEAD') {
+    parts.push('-d', `'${body.replace(/'/g, "'\\''")}'`);
+  }
+  parts.push(`'${url}'`);
+  return parts.join(' ');
+}
+
 export class TestExecutor {
   private httpClient: HttpClient;
   private redaction: RedactionRegistry;
@@ -19,6 +37,10 @@ export class TestExecutor {
     this.redaction = redaction;
   }
 
+  public getRedactionRegistry(): RedactionRegistry {
+    return this.redaction;
+  }
+
   public async executeTest(
     test: TestCase,
     spec: TestSpecification,
@@ -26,7 +48,7 @@ export class TestExecutor {
   ): Promise<TestExecutionResult> {
     const startTime = performance.now();
 
-    // 1. Check if skipped
+    // 1. Check if skipped or filtered out
     if (test.skip) {
       return {
         id: test.id,
@@ -40,6 +62,29 @@ export class TestExecutor {
         },
         assertions: [],
       };
+    }
+
+    if (options.filter) {
+      let filterRegex: RegExp;
+      try {
+        filterRegex = new RegExp(options.filter, 'i');
+      } catch {
+        filterRegex = new RegExp(options.filter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      }
+      if (!filterRegex.test(test.id) && !filterRegex.test(test.name)) {
+        return {
+          id: test.id,
+          name: test.name,
+          status: 'SKIPPED',
+          durationMs: 0,
+          request: {
+            method: test.request.method,
+            url: test.request.path,
+            headers: {},
+          },
+          assertions: [],
+        };
+      }
     }
 
     // 2. Resolve configurations
@@ -65,6 +110,10 @@ export class TestExecutor {
       spec.config?.redirect ??
       DEFAULTS.REDIRECT_POLICY;
 
+    const retryConfig = test.request.retry ?? spec.config?.retry;
+    const blockPrivateNetworks =
+      options.blockPrivateNetworks ?? spec.config?.blockPrivateNetworks ?? false;
+
     // 3. Security check: Destructive method guard
     try {
       assertMethodAllowed(test.request.method, allowDestructive);
@@ -88,15 +137,22 @@ export class TestExecutor {
       };
     }
 
-    // 4. Substitute environment variables
-    const env = options.env ?? process.env;
+    // 4. Substitute environment and session variables
+    const baseEnv = options.env ?? process.env;
+    const combinedEnv: Record<string, string | undefined> = {
+      ...baseEnv,
+      ...(options.sessionVariables ?? {}),
+    };
 
-    const { text: subPath, secretValues: pathSecrets } = substituteString(test.request.path, env);
+    const { text: subPath, secretValues: pathSecrets } = substituteString(
+      test.request.path,
+      combinedEnv,
+    );
     this.redaction.addSecrets(pathSecrets);
 
     const { result: subQuery, substitutedSecrets: querySecrets } = substituteEnvInValue(
       test.request.query,
-      env,
+      combinedEnv,
     );
     this.redaction.addSecrets(querySecrets);
 
@@ -107,7 +163,7 @@ export class TestExecutor {
     };
     const { result: subHeaders, substitutedSecrets: headerSecrets } = substituteEnvInValue(
       rawHeaders,
-      env,
+      combinedEnv,
     );
     this.redaction.addSecrets(headerSecrets);
 
@@ -116,7 +172,7 @@ export class TestExecutor {
     if (test.request.body !== undefined) {
       const { result: subBody, substitutedSecrets: bodySecrets } = substituteEnvInValue(
         test.request.body,
-        env,
+        combinedEnv,
       );
       this.redaction.addSecrets(bodySecrets);
 
@@ -158,6 +214,31 @@ export class TestExecutor {
       };
     }
 
+    // Dry-run / cURL preview mode
+    if (options.dryRun) {
+      const curlCmd = buildCurlCommand(
+        test.request.method,
+        targetUrl,
+        this.redaction.redactHeaders(subHeaders),
+        requestBodyString ? this.redaction.redactText(requestBodyString) : undefined,
+      );
+
+      const durationMs = Math.round((performance.now() - startTime) * 100) / 100;
+      return {
+        id: test.id,
+        name: test.name,
+        status: 'PASSED',
+        durationMs,
+        request: {
+          method: test.request.method,
+          url: this.redaction.redactUrl(targetUrl),
+          headers: this.redaction.redactHeaders(subHeaders),
+        },
+        curlPreview: curlCmd,
+        assertions: [],
+      };
+    }
+
     const httpRequest: HttpRequest = {
       url: targetUrl,
       method: test.request.method,
@@ -166,6 +247,8 @@ export class TestExecutor {
       timeoutMs,
       redirect: redirectPolicy,
       maxBodyBytes,
+      retry: retryConfig,
+      blockPrivateNetworks,
     };
 
     // 6. Execute HTTP request
@@ -207,6 +290,23 @@ export class TestExecutor {
     // Deeply redact all assertion diagnostic messages, expected, and actual values
     const assertionResults = this.redaction.redactDeep(rawAssertionResults);
 
+    // 8. Capture variables for downstream tests if defined
+    const captured: Record<string, string> = {};
+    if (test.expect.capture && typeof test.expect.capture === 'object') {
+      for (const [varName, capturePath] of Object.entries(test.expect.capture)) {
+        const { found, value } = resolveResponseValue(response, capturePath);
+        if (found && value !== undefined && value !== null) {
+          const strVal = typeof value === 'string' ? value : JSON.stringify(value);
+          captured[varName] = strVal;
+          // Immediately register captured value in the redaction registry
+          this.redaction.addSecret(strVal);
+          if (options.sessionVariables) {
+            options.sessionVariables[varName] = strVal;
+          }
+        }
+      }
+    }
+
     // Body preview for diagnostics on failure
     let bodyPreview: string | undefined;
     if (!allPassed && response.bodyText) {
@@ -234,6 +334,7 @@ export class TestExecutor {
         responseTimeMs: response.responseTimeMs,
         bodyPreview,
       },
+      capturedVariables: Object.keys(captured).length > 0 ? captured : undefined,
       assertions: assertionResults,
     };
   }

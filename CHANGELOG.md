@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-11-18
+
+### Added
+
+- **Chained Multi-Step Workflows (`capture`)**:
+  - Declarative extraction of response fields or headers (`capture: { "VAR_NAME": "path" }`).
+  - Downstream interpolation of captured values via `${VAR_NAME}` in request paths, headers, query parameters, and payloads.
+  - Automatic registration of all dynamically captured secrets in `RedactionRegistry` to prevent leaks.
+- **Advanced Declarative Assertions**:
+  - Status classes: Accepted string status ranges (`"1xx"`, `"2xx"`, `"3xx"`, `"4xx"`, `"5xx"`) alongside exact codes and numeric arrays.
+  - Regex pattern matching: `matches` block for header and body field regular expressions.
+  - Numeric boundary checks: `numeric` block supporting `gt`, `gte`, `lt`, `lte`, and `eq`.
+  - Array validation: `array` block supporting `length`, `minItems`, `maxItems`, and `isNotEmpty`.
+- **Ecosystem & Tooling Commands**:
+  - `import-openapi`: CLI command that parses OpenAPI 3.0 / 3.1 YAML and JSON files and scaffolds valid test specifications.
+  - `mock`: Local HTTP mock server that simulates endpoints and schemas declared in contract specifications.
+  - `export-schema`: CLI command and pre-built JSON Schema (`schemas/v1/contract.json`) for IDE auto-completion.
+- **CI/CD Enterprise Reporting**:
+  - `JUnitReporter` (`--format junit`): Compliant JUnit XML test report output.
+  - GitHub Actions integration: Native Markdown step summaries (`--github-summary` / `$GITHUB_STEP_SUMMARY`) and workflow command annotations (`::error ...::`).
+- **Security & Reliability Enhancements**:
+  - Private network / SSRF shield (`--block-private-networks` / `config.blockPrivateNetworks`): DNS lookup verification blocking loopback, RFC1918 private, link-local, and cloud metadata (`169.254.169.254`) IP addresses.
+  - Request retries (`retry` config): Configurable per-request retry attempts and backoff delay for resilient execution.
+- **Developer Ergonomics**:
+  - Test filtering: `-k, --filter <pattern>` to execute specific tests by name or ID.
+  - Dry-run / cURL preview: `--dry-run` and `--curl` flags to generate executable cURL commands without sending network requests.
+  - Watch mode: `-w, --watch` to monitor specifications and environment files for live test re-execution.
+- Expanded test suite: 92 unit and integration tests across 20 test suites (100% passing).
+
 ## [0.1.0] - 2026-10-10
 
 ### Added

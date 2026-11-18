@@ -1,5 +1,6 @@
 import { performance } from 'node:perf_hooks';
 import { DEFAULTS } from '../config/defaults.js';
+import { assertPublicDestination } from '../security/dns.js';
 import { PayloadLimitExceededError } from '../security/guards.js';
 import { validateRedirectTarget } from './redirects.js';
 import { type HttpRequest, type HttpResponse, TransportError } from './types.js';
@@ -7,9 +8,34 @@ import { type HttpRequest, type HttpResponse, TransportError } from './types.js'
 export class HttpClient {
   /**
    * Executes an HTTP request safely with timeouts spanning header & body retrieval,
-   * payload size bounds, redirect leak prevention, and cycle detection.
+   * payload size bounds, redirect leak prevention, cycle detection, private IP gating,
+   * and configurable retries.
    */
   public async execute(request: HttpRequest): Promise<HttpResponse> {
+    const maxAttempts = request.retry?.maxAttempts ?? 1;
+    const backoffMs = request.retry?.backoffMs ?? 100;
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await this.executeSingle(request);
+      } catch (err) {
+        lastError = err;
+        // Only retry on network transport errors, not security or payload cap errors
+        if (err instanceof TransportError && attempt < maxAttempts) {
+          if (backoffMs > 0) {
+            await new Promise((resolve) => setTimeout(resolve, backoffMs * attempt));
+          }
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    throw lastError;
+  }
+
+  private async executeSingle(request: HttpRequest): Promise<HttpResponse> {
     const initialUrl = new URL(request.url);
     const initialOrigin = initialUrl.origin;
 
@@ -24,6 +50,11 @@ export class HttpClient {
     const startTime = performance.now();
 
     while (true) {
+      // Check private network restrictions before connecting
+      if (request.blockPrivateNetworks) {
+        await assertPublicDestination(currentUrl);
+      }
+
       const controller = new AbortController();
       let timedOut = false;
 

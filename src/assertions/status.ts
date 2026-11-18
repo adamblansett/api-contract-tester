@@ -1,28 +1,40 @@
 import type { HttpResponse } from '../http/types.js';
+import type { ExpectedStatus, StatusClass } from '../spec/types.js';
 import type { AssertionResult } from './types.js';
+
+function matchesStatus(expected: number | StatusClass, actual: number): boolean {
+  if (typeof expected === 'number') {
+    return expected === actual;
+  }
+  const prefix = parseInt(expected.charAt(0), 10);
+  if (isNaN(prefix)) return false;
+  const min = prefix * 100;
+  const max = min + 99;
+  return actual >= min && actual <= max;
+}
 
 export function assertStatus(
   response: HttpResponse,
-  expectedStatus?: number | number[],
+  expectedStatus?: ExpectedStatus,
 ): AssertionResult | null {
   if (expectedStatus === undefined) {
     return null;
   }
 
   if (Array.isArray(expectedStatus)) {
-    const passed = expectedStatus.includes(response.status);
+    const passed = expectedStatus.some((s) => matchesStatus(s, response.status));
     return {
       name: 'Status Code',
       passed,
       message: passed
-        ? `Status ${response.status} is one of [${expectedStatus.join(', ')}]`
-        : `Expected status to be one of [${expectedStatus.join(', ')}], received ${response.status}`,
+        ? `Status ${response.status} matches expected [${expectedStatus.join(', ')}]`
+        : `Expected status to match [${expectedStatus.join(', ')}], received ${response.status}`,
       expected: expectedStatus,
       actual: response.status,
     };
   }
 
-  const passed = response.status === expectedStatus;
+  const passed = matchesStatus(expectedStatus, response.status);
   return {
     name: 'Status Code',
     passed,

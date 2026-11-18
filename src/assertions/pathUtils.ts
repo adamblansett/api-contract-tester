@@ -1,3 +1,5 @@
+import type { HttpResponse } from '../http/types.js';
+
 export interface PathLookupResult {
   found: boolean;
   value: unknown;
@@ -51,4 +53,38 @@ export function getNestedProperty(target: unknown, path: string): PathLookupResu
   }
 
   return { found: true, value: current };
+}
+
+/**
+ * Resolves a property path targeting either response headers or the parsed JSON body.
+ * Supports:
+ *  - "headers['content-type']" or "headers.etag" -> response headers
+ *  - "body.user.id" or "user.id" -> response.bodyJson
+ *  - "body" -> response.bodyJson or response.bodyText
+ */
+export function resolveResponseValue(response: HttpResponse, path: string): PathLookupResult {
+  if (!path || typeof path !== 'string') {
+    return { found: false, value: undefined };
+  }
+
+  const trimmed = path.trim();
+
+  // Check headers lookup
+  const headerMatch = trimmed.match(/^headers(?:\[['"](.+?)['"]\]|\.([a-zA-Z0-9_-]+))/i);
+  if (headerMatch) {
+    const headerName = (headerMatch[1] ?? headerMatch[2])?.toLowerCase();
+    if (!headerName) return { found: false, value: undefined };
+    const hasHeader = Object.prototype.hasOwnProperty.call(response.headers, headerName);
+    return { found: hasHeader, value: response.headers[headerName] };
+  }
+
+  if (trimmed === 'body') {
+    return { found: true, value: response.bodyJson ?? response.bodyText };
+  }
+
+  if (trimmed.startsWith('body.')) {
+    return getNestedProperty(response.bodyJson, trimmed.slice(5));
+  }
+
+  return getNestedProperty(response.bodyJson, trimmed);
 }

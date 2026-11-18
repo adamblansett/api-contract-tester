@@ -27,6 +27,8 @@ export interface TestExecutionResult {
   request: ExecutedRequestSummary;
   response?: ExecutedResponseSummary;
   assertions: AssertionResult[];
+  capturedVariables?: Record<string, string>;
+  curlPreview?: string;
   error?: {
     message: string;
     isTransport?: boolean;
@@ -56,4 +58,8 @@ export interface RunnerOptions {
   maxBodyBytes?: number;
   redirect?: RedirectPolicy;
   env?: Record<string, string | undefined>;
+  filter?: string;
+  blockPrivateNetworks?: boolean;
+  dryRun?: boolean;
+  sessionVariables?: Record<string, string>;
 }

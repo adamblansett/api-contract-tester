@@ -1,0 +1,327 @@
+{
+  "$ref": "#/definitions/TestSpecification",
+  "definitions": {
+    "TestSpecification": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^1\\.\\d+(\\.\\d+)?$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "config": {
+          "type": "object",
+          "properties": {
+            "baseUrl": {
+              "type": "string",
+              "format": "uri"
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxBodyBytes": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "headers": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "allowDestructive": {
+              "type": "boolean"
+            },
+            "redirect": {
+              "type": "string",
+              "enum": ["manual", "follow-same-origin", "error"]
+            },
+            "retry": {
+              "type": "object",
+              "properties": {
+                "maxAttempts": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10
+                },
+                "backoffMs": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": ["maxAttempts"],
+              "additionalProperties": false
+            },
+            "blockPrivateNetworks": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[a-zA-Z0-9_-]+$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": {
+                "type": "string"
+              },
+              "skip": {
+                "type": "boolean"
+              },
+              "request": {
+                "type": "object",
+                "properties": {
+                  "method": {
+                    "type": "string",
+                    "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+                  },
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "query": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": ["string", "number", "boolean"]
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "body": {},
+                  "timeoutMs": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0
+                  },
+                  "redirect": {
+                    "type": "string",
+                    "enum": ["manual", "follow-same-origin", "error"]
+                  },
+                  "retry": {
+                    "type": "object",
+                    "properties": {
+                      "maxAttempts": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10
+                      },
+                      "backoffMs": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "required": ["maxAttempts"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["method", "path"],
+                "additionalProperties": false
+              },
+              "expect": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 100,
+                            "maximum": 599
+                          },
+                          {
+                            "type": "string",
+                            "enum": ["1xx", "2xx", "3xx", "4xx", "5xx"]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 100,
+                              "maximum": 599
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["1xx", "2xx", "3xx", "4xx", "5xx"]
+                            }
+                          ]
+                        },
+                        "minItems": 1
+                      }
+                    ]
+                  },
+                  "headers": {
+                    "type": "object",
+                    "properties": {
+                      "required": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "minItems": 1
+                          }
+                        ]
+                      },
+                      "prohibited": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "minItems": 1
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "contentType": {
+                    "type": "string"
+                  },
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "hasProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "exact": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "contains": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "matches": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "numeric": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "gt": {
+                          "type": "number"
+                        },
+                        "gte": {
+                          "type": "number"
+                        },
+                        "lt": {
+                          "type": "number"
+                        },
+                        "lte": {
+                          "type": "number"
+                        },
+                        "eq": {
+                          "type": "number"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "array": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "length": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "minItems": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "maxItems": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "isNotEmpty": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "capture": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "maxResponseTimeMs": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["id", "name", "request", "expect"],
+            "additionalProperties": false
+          },
+          "minItems": 1
+        }
+      },
+      "required": ["version", "name", "tests"],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
