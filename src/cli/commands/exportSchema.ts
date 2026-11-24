@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { z } from 'zod';
 import { ExitCode } from '../../config/exitCodes.js';
 import { TestSpecificationSchema } from '../../spec/schema.js';
 
@@ -9,9 +9,9 @@ export interface ExportSchemaOptions {
 }
 
 export function generateContractJsonSchema(): Record<string, unknown> {
-  return zodToJsonSchema(TestSpecificationSchema, {
-    name: 'TestSpecification',
-    $refStrategy: 'none',
+  return z.toJSONSchema(TestSpecificationSchema, {
+    reused: 'inline',
+    unrepresentable: 'any',
   }) as Record<string, unknown>;
 }
 
